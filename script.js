@@ -29,7 +29,7 @@ const POEMS = [
     "All that was spoken shall return as light—your whisper becomes the infinite night."
 ];
 
-// 25 SoundCloud Track URLs
+// 25 SoundCloud Track URLs (Raw)
 const SOUNDCLOUD_URLS = [
 "https://soundcloud.com/mutantradio/scrying-the-landscape-elina-tapio-and-hannah-pezzack-02042021",
 "https://soundcloud.com/mutantradio/scrying-the-landscape-ii-w-elina-tapio-hannah-pezzack-28052021",
@@ -53,26 +53,33 @@ const SOUNDCLOUD_URLS = [
 "https://soundcloud.com/mutantradio/scrying-the-landscape-w-dim-garden-071124",
 "https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-hannah-pezzack-080225",
 "https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-hannah-pezzack-100425-5",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-alina-valentina-100625-4",
 "https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-hannah-pezzack-100425-5",
+"https://soundcloud.com/mutantradio/scrying-the-landscape-w-alina-valentina-100625-4",
 "https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-hannah-pezzack-100425-5"
 ];
 
-// 6 Color Palettes for Waves
+// 6 Color Palettes for Waves [baseColor, particleColor1, particleColor2]
+// Colors are in [R, G, B] format for p5.js
 const WAVE_COLORS = [
+    // Silver
     { base: [192, 192, 192], particles: [[220, 220, 220], [160, 160, 160], [255, 255, 255]] },
+    // Gold
     { base: [255, 215, 0], particles: [[255, 223, 70], [230, 190, 0], [255, 248, 220]] },
+    // Neon Mint
     { base: [57, 255, 20], particles: [[150, 255, 130], [200, 255, 180], [230, 255, 230]] },
+    // Neon Pink
     { base: [255, 105, 180], particles: [[255, 182, 217], [255, 20, 147], [255, 200, 220]] },
+    // Purple
     { base: [138, 43, 226], particles: [[180, 100, 255], [100, 20, 200], [200, 160, 255]] },
+    // Cyan
     { base: [0, 255, 255], particles: [[150, 255, 255], [0, 200, 200], [220, 255, 255]] }
 ];
 
 // --- GLOBAL STATE & DOM ELEMENTS ---
 let wishes = [];
 let currentIframe = null;
-let currentWidget = null;
 let questionHidden = false;
+
 let questionEl, wavesContainer, formEl, inputEl, audioContainer, bgContainer;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -86,25 +93,28 @@ document.addEventListener('DOMContentLoaded', () => {
     loadWishes();
     renderWaves();
     setupEventListeners();
+
     new p5(backgroundSketch, bgContainer);
 });
 
+// --- EVENT LISTENERS ---
 function setupEventListeners() {
     formEl.addEventListener('submit', handleSendWish);
+
     inputEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' || e.keyCode === 13) {
             e.preventDefault();
             inputEl.value = "";
             inputEl.placeholder = "Please click 'Send' to begin...";
         }
     });
+
     inputEl.addEventListener('focus', () => {
         inputEl.placeholder = "Weave your words...";
     });
 }
 
 // --- CORE LOGIC ---
-
 function handleSendWish(e) {
     e.preventDefault();
     const text = inputEl.value.trim();
@@ -121,10 +131,10 @@ function handleSendWish(e) {
     const colorIndex = wishIndex % WAVE_COLORS.length;
 
     const newWish = {
-        text,
+        text: text,
         poem: POEMS[poemIndex],
-        trackIndex,
-        colorIndex,
+        trackIndex: trackIndex,
+        colorIndex: colorIndex,
         timestamp: Date.now()
     };
 
@@ -132,37 +142,29 @@ function handleSendWish(e) {
     saveWishes();
     createWaveElement(newWish);
     playTrack(newWish.trackIndex);
+
     inputEl.value = '';
     inputEl.placeholder = "Weave your words...";
 }
 
-// ✅ Fixed autoplay version for iPhone/iPad
 function playTrack(index) {
     if (currentIframe) currentIframe.remove();
-    currentWidget = null;
 
     const rawUrl = SOUNDCLOUD_URLS[index];
-    const embedUrl = `https://w.soundcloud.com/player/?url=${encodeURIComponent(rawUrl)}&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false`;
-
+    const embedUrl = `https://w.soundcloud.com/player/?url=${rawUrl}&color=%23000000&auto_play=true&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false`;
     const iframe = document.createElement('iframe');
     iframe.width = "100%";
     iframe.height = "166";
+    iframe.scrolling = "no";
     iframe.frameBorder = "no";
     iframe.allow = "autoplay";
-    iframe.scrolling = "no";
     iframe.src = embedUrl;
     audioContainer.appendChild(iframe);
     currentIframe = iframe;
-
-    iframe.addEventListener('load', () => {
-        const widget = SC.Widget(iframe);
-        widget.bind(SC.Widget.Events.READY, () => {
-            widget.play(); // <-- iOS-safe autoplay
-        });
-        currentWidget = widget;
-    });
+    console.log(`[Elina] Autoplay initiated by trusted click. Playing track ${index}`);
 }
 
+// --- CREATE WAVE ELEMENT ---
 function createWaveElement(wish) {
     const wrapper = document.createElement('div');
     wrapper.className = 'wave-wrapper';
@@ -170,7 +172,7 @@ function createWaveElement(wish) {
 
     const canvasContainer = document.createElement('div');
     canvasContainer.className = 'wave-canvas';
-    canvasContainer.id = `wave-canvas-${wish.timestamp}`;
+    canvasContainer.id = `wave-canvas-${wish.timestamp}`; 
 
     const poemEl = document.createElement('p');
     poemEl.className = 'wave-poem';
@@ -183,7 +185,11 @@ function createWaveElement(wish) {
     wrapper.appendChild(canvasContainer);
     wrapper.appendChild(poemEl);
     wrapper.appendChild(wishTextEl);
-    wrapper.addEventListener('click', () => playTrack(wish.trackIndex));
+
+    wrapper.addEventListener('click', () => {
+        playTrack(wish.trackIndex);
+    });
+
     wavesContainer.prepend(wrapper);
     new p5(createWaveSketch(wish), canvasContainer.id);
 }
@@ -194,23 +200,26 @@ function renderWaves() {
         questionEl.classList.add('hidden');
         questionHidden = true;
     }
-    for (const wish of wishes) createWaveElement(wish);
+    for (const wish of wishes) {
+        createWaveElement(wish);
+    }
 }
 
+// --- LOCAL STORAGE ---
 function saveWishes() {
     localStorage.setItem('elinaWishes', JSON.stringify(wishes));
 }
 
 function loadWishes() {
-    const saved = localStorage.getItem('elinaWishes');
-    if (saved) wishes = JSON.parse(saved);
+    const savedWishes = localStorage.getItem('elinaWishes');
+    if (savedWishes) wishes = JSON.parse(savedWishes);
 }
 
-// --- p5.js sketches below (same as before) ---
-
+// --- BACKGROUND PARTICLES ---
 const backgroundSketch = (p) => {
     let particles = [];
-    const num = 80;
+    const numParticles = 80;
+
     class Particle {
         constructor() {
             this.x = p.random(p.width);
@@ -221,7 +230,8 @@ const backgroundSketch = (p) => {
             this.offset = p.random(1000);
         }
         update() {
-            this.x += this.vx; this.y += this.vy;
+            this.x += this.vx;
+            this.y += this.vy;
             if (this.x > p.width) this.x = 0;
             if (this.x < 0) this.x = p.width;
             if (this.y > p.height) this.y = 0;
@@ -229,68 +239,108 @@ const backgroundSketch = (p) => {
         }
         show() {
             let alpha = p.map(p.sin(p.frameCount * 0.01 + this.offset), -1, 1, 10, 70);
-            p.noStroke(); p.fill(255, 255, 255, alpha);
+            p.noStroke();
+            p.fill(255, 255, 255, alpha);
             p.ellipse(this.x, this.y, this.size);
         }
     }
+
     p.setup = () => {
         p.createCanvas(window.innerWidth, window.innerHeight);
-        for (let i = 0; i < num; i++) particles.push(new Particle());
+        for (let i = 0; i < numParticles; i++) {
+            particles.push(new Particle());
+        }
     };
     p.draw = () => {
         p.clear();
-        for (let part of particles) { part.update(); part.show(); }
+        for (let particle of particles) {
+            particle.update();
+            particle.show();
+        }
     };
-    p.windowResized = () => p.resizeCanvas(window.innerWidth, window.innerHeight);
+    p.windowResized = () => {
+        p.resizeCanvas(window.innerWidth, window.innerHeight);
+    };
 };
 
+// --- MULTI-THREAD SINE WAVE SKETCH ---
 const createWaveSketch = (wish) => {
     return (p) => {
-        let particles = [];
+        let threads = [];
+        const numThreads = 3; // stacked waves
+        const numPoints = 200;
         let time = 0;
         const palette = WAVE_COLORS[wish.colorIndex];
-        const colors = palette.particles;
-        const num = 300;
-        const getH = () => window.innerWidth <= 768 ? 250 : 300;
 
-        class WaveParticle {
-            constructor() {
-                this.x = p.random(p.width);
-                this.yOffset = p.random(-1, 1);
-                this.vx = p.random(0.5, 1.5);
-                this.color = p.random(colors);
-                this.offset = p.random(1000);
-                this.proximity = 1 - p.abs(this.yOffset);
-                this.size = p.map(this.proximity, 0, 1, 1, 4);
-                this.alpha = p.map(this.proximity, 0, 1, 100, 255);
+        const getWaveHeight = () => window.innerWidth <= 768 ? 250 : 300;
+
+        class WaveThread {
+            constructor(offset) {
+                this.offset = offset;
+                this.color = palette.particles[Math.floor(Math.random() * palette.particles.length)];
             }
-            update(t) {
-                let amp1 = p.sin(this.x * 0.01 + t + this.offset) * (p.height / 7);
-                let amp2 = p.cos(this.x * 0.008 - t * 0.8 + this.offset) * (p.height / 9);
-                let n = p.noise(this.x * 0.005, t * 0.3 + this.offset);
-                this.y = p.height / 2 + this.yOffset * (amp1 + amp2) * n;
-                this.x = (this.x + this.vx) % p.width;
+            getY(x) {
+                return getWaveHeight()/2 +
+                    Math.sin((x*0.02) + time + this.offset)*60 +
+                    Math.sin((x*0.01) - time*0.5 + this.offset)*40;
             }
             show() {
-                p.noStroke();
-                p.fill(this.color[0], this.color[1], this.color[2], this.alpha);
-                p.ellipse(this.x, this.y, this.size);
+                p.noFill();
+                p.stroke(this.color[0], this.color[1], this.color[2], 200);
+                p.strokeWeight(2);
+                p.beginShape();
+                for (let i = 0; i < p.width; i+=2) {
+                    p.vertex(i, this.getY(i));
+                }
+                p.endShape();
             }
         }
 
+        class Particle {
+            constructor() {
+                this.x = p.random(p.width);
+                this.y = p.random(getWaveHeight());
+                this.vx = p.random(0.2, 1);
+                this.color = palette.particles[Math.floor(Math.random()*palette.particles.length)];
+                this.size = p.random(1,3);
+            }
+            update() {
+                this.x += this.vx;
+                if(this.x>p.width)this.x=0;
+            }
+            show() {
+                p.noStroke();
+                p.fill(this.color[0],this.color[1],this.color[2],150);
+                p.ellipse(this.x,this.y,this.size);
+            }
+        }
+
+        let particles = [];
+
         p.setup = () => {
-            const parentW = document.getElementById(`wave-canvas-${wish.timestamp}`).clientWidth;
-            p.createCanvas(parentW, getH());
-            for (let i = 0; i < num; i++) particles.push(new WaveParticle());
-        };
+            const parentWidth = document.getElementById(`wave-canvas-${wish.timestamp}`).clientWidth;
+            p.createCanvas(parentWidth, getWaveHeight());
+            for(let i=0;i<numThreads;i++){
+                threads.push(new WaveThread(i*1.5));
+            }
+            for(let i=0;i<200;i++){
+                particles.push(new Particle());
+            }
+        }
+
         p.draw = () => {
             p.background(0);
-            for (let part of particles) { part.update(time); part.show(); }
-            time += 0.02;
-        };
+            for(let t of threads) t.show();
+            for(let pt of particles){
+                pt.update();
+                pt.show();
+            }
+            time+=0.03;
+        }
+
         p.windowResized = () => {
-            const parentW = document.getElementById(`wave-canvas-${wish.timestamp}`).clientWidth;
-            p.resizeCanvas(parentW, getH());
-        };
-    };
+            const parentWidth = document.getElementById(`wave-canvas-${wish.timestamp}`).clientWidth;
+            p.resizeCanvas(parentWidth, getWaveHeight());
+        }
+    }
 };
