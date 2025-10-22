@@ -72,10 +72,10 @@ const WAVE_COLORS = [
 let wishes = [];
 let questionHidden = false;
 let questionEl, wavesContainer, formEl, inputEl, audioContainer, bgContainer, audioEl;
+let clientId = null;
 let trackIds = new Array(SOUNDCLOUD_URLS.length); // Pre-resolved track IDs
-const clientId = 'YOUR_CLIENT_ID_HERE'; // Replace with the value you extract from browser network tab
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     questionEl = document.getElementById('main-question');
     wavesContainer = document.getElementById('waves-container');
     formEl = document.getElementById('wish-form');
@@ -84,20 +84,71 @@ document.addEventListener('DOMContentLoaded', () => {
     bgContainer = document.getElementById('bg-particle-container');
     audioEl = document.getElementById('audio-player');
 
-    SC.initialize({ client_id: clientId });
+    // Extract client_id dynamically
+    clientId = await extractClientId();
+    if (!clientId) {
+        console.error('Failed to extract SoundCloud client_id');
+        // Fallback to widget method or alert user
+        return;
+    }
 
-    // Pre-resolve all track IDs
-    SOUNDCLOUD_URLS.forEach((url, index) => {
-        SC.resolve(url).then(track => {
+    // Pre-resolve all track IDs using client_id
+    for (let index = 0; index < SOUNDCLOUD_URLS.length; index++) {
+        const url = SOUNDCLOUD_URLS[index];
+        const resolveUrl = `https://api.soundcloud.com/resolve?url=${encodeURIComponent(url)}&client_id=${clientId}`;
+        try {
+            const response = await fetch(resolveUrl);
+            const track = await response.json();
             trackIds[index] = track.id;
-        }).catch(err => console.error(`Failed to resolve track ${index}:`, err));
-    });
+        } catch (err) {
+            console.error(`Failed to resolve track ${index}:`, err);
+        }
+    }
 
     loadWishes();
     renderWaves();
     setupEventListeners();
     new p5(backgroundSketch, bgContainer);
 });
+
+async function extractClientId() {
+    const proxy = 'https://allorigins.win/get?url=';
+    const soundcloudUrl = 'https://soundcloud.com/';
+
+    try {
+        // Fetch main page
+        const pageResponse = await fetch(proxy + encodeURIComponent(soundcloudUrl));
+        const pageData = await pageResponse.json();
+        const pageHtml = pageData.contents;
+
+        // Find script srcs (reverse to find latest)
+        const scriptRegex = /<script[^>]+src="([^"]+)"[^>]*>/g;
+        const scripts = [];
+        let match;
+        while ((match = scriptRegex.exec(pageHtml)) !== null) {
+            scripts.push(match[1]);
+        }
+        scripts.reverse(); // As in youtube-dl
+
+        // Fetch scripts and search for client_id
+        for (const src of scripts) {
+            if (src.startsWith('https://a-v2.sndcdn.com/')) { // Likely the JS bundles
+                const scriptResponse = await fetch(proxy + encodeURIComponent(src));
+                const scriptData = await scriptResponse.json();
+                const scriptContent = scriptData.contents;
+
+                const idRegex = /client_id\s*:\s*"([0-9a-zA-Z]{32})"/;
+                const idMatch = scriptContent.match(idRegex);
+                if (idMatch) {
+                    return idMatch[1];
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error extracting client_id:', err);
+    }
+    return null;
+}
 
 function setupEventListeners() {
     formEl.addEventListener('submit', handleSendWish);
@@ -147,8 +198,8 @@ function handleSendWish(e) {
 }
 
 function playTrack(index) {
-    if (!trackIds[index]) {
-        console.error(`Track ID for index ${index} not resolved yet.`);
+    if (!trackIds[index] || !clientId) {
+        console.error(`Track ID or client_id not available for index ${index}`);
         return;
     }
 
@@ -241,7 +292,7 @@ const createWaveSketch = (wish) => {
     return (p) => {
         let time = 0;
         const palette = WAVE_COLORS[wish.colorIndex];
-        const numWaves = 5;
+        const numWaves = 8; // More waves for depth
         const getH = () => window.innerWidth <= 768 ? 250 : 300;
 
         p.setup = () => {
@@ -252,20 +303,31 @@ const createWaveSketch = (wish) => {
             p.background(0);
             for (let i = 0; i < numWaves; i++) {
                 const color = p.random(palette.particles);
-                p.stroke(color[0], color[1], color[2], 200 - i * 30); // Fading alpha for depth
-                p.strokeWeight(2 + i * 0.5); // Varying thickness
-                p.noFill();
+                const alpha = 150 - i * 20; // Fading for layers
+                p.stroke(color[0], color[1], color[2], alpha);
+                p.strokeWeight(3 + i * 0.3); // Thicker base
+                p.fill(color[0], color[1], color[2], alpha / 4); // Semi-transparent fill for glow
+
                 p.beginShape();
-                const amp = (p.height / 4) * (1 + 0.3 * p.sin(time * 0.1 + i)); // Bouncing amplitude
-                const freq = 0.01 + i * 0.002; // Different frequencies
-                const phase = time * (1 + i * 0.2) + i * p.PI / numWaves; // Moving and phased
-                for (let x = 0; x < p.width; x += 5) { // Step for performance
-                    const y = p.height / 2 + amp * p.sin(x * freq + phase);
+                const baseAmp = p.height / 3;
+                const pulse = 1 + 0.5 * p.sin(time * 0.15 + i * 0.5); // Stronger pulsing
+                const amp = baseAmp * pulse;
+                const freq = 0.008 + i * 0.003; // Wider frequency range
+                const phase = time * (1.5 + i * 0.3) + i * p.PI / numWaves; // Faster movement
+                const noiseScale = amp / 4; // Organic noise
+
+                let prevY = p.height / 2;
+                p.vertex(0, p.height); // For fill to bottom
+                for (let x = 0; x < p.width; x += 3) { // Finer steps for smoothness
+                    const noiseVal = p.noise(x * 0.005, time * 0.2 + i) * 2 - 1; // Perlin for hypnosis
+                    const y = p.height / 2 + amp * p.sin(x * freq + phase) + noiseVal * noiseScale;
                     p.vertex(x, y);
+                    prevY = y;
                 }
-                p.endShape();
+                p.vertex(p.width, p.height); // Close fill
+                p.endShape(p.CLOSE); // Fill under wave
             }
-            time += 0.02; // Animation speed
+            time += 0.05; // Faster animation for dynamism
         };
         p.windowResized = () => {
             const parentW = document.getElementById(`wave-canvas-${wish.timestamp}`).clientWidth;
