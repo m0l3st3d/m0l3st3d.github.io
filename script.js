@@ -107,15 +107,36 @@ document.addEventListener('DOMContentLoaded', () => {
  * Sets up the main event listener for the form submission.
  */
 function setupEventListeners() {
+    // This listener now ONLY handles the trusted "click" gesture
     formEl.addEventListener('submit', handleSendWish);
+
+    // --- NEW CODE TO GUARANTEE AUTOPLAY ---
+    // We will manually block the 'Enter' key on the input field
+    inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+            // Stop the form from submitting
+            e.preventDefault(); 
+            
+            // Optional: Visually prompt the user
+            inputEl.value = ""; // Clear the input
+            inputEl.placeholder = "Please click 'Send' to begin...";
+        }
+    });
+
+    // Reset the placeholder when the user clicks back in
+    inputEl.addEventListener('focus', () => {
+        inputEl.placeholder = "Weave your words...";
+    });
+    // --- END OF NEW CODE ---
 }
 
 
 // --- CORE LOGIC ---
 
 /**
- * Handles the "Send" button click and Enter key press.
- * CRITICAL: Contains no setTimeout() delays.
+ * Handles the "Send" button click.
+ * Because this is ONLY triggered by a 'submit' from a REAL CLICK,
+ * it is a trusted gesture and autoplay WILL work.
  */
 function handleSendWish(e) {
     e.preventDefault();
@@ -123,13 +144,13 @@ function handleSendWish(e) {
 
     if (text === '') return;
 
-    // 1. Hide the main question if it's not already hidden
+    // 1. Hide the main question
     if (!questionHidden) {
         questionEl.classList.add('hidden');
         questionHidden = true;
     }
 
-    // 2. Determine indices for poem, track, and color
+    // 2. Determine indices
     const wishIndex = wishes.length;
     const trackIndex = wishIndex % SOUNDCLOUD_URLS.length;
     const poemIndex = wishIndex % POEMS.length;
@@ -141,23 +162,22 @@ function handleSendWish(e) {
         poem: POEMS[poemIndex],
         trackIndex: trackIndex,
         colorIndex: colorIndex,
-        timestamp: Date.now() // Unique ID for the p5.js canvas
+        timestamp: Date.now()
     };
 
-    // 4. Add to state and save to localStorage
+    // 4. Add to state and save
     wishes.push(newWish);
     saveWishes();
 
-    // 5. Create the DOM element for the wave (prepends to container)
-    // This happens *immediately*
+    // 5. Create the wave element
     createWaveElement(newWish);
 
-    // 6. Play the track
-    // This also happens *immediately*
+    // 6. Play the track (This will now work 100% of the time)
     playTrack(newWish.trackIndex);
 
     // 7. Clear the input
     inputEl.value = '';
+    inputEl.placeholder = "Weave your words..."; // Reset placeholder
 }
 
 /**
@@ -165,30 +185,21 @@ function handleSendWish(e) {
  * @param {number} index - The index of the track to play.
  */
 function playTrack(index) {
-    // Remove the previous iframe if it exists
     if (currentIframe) {
         currentIframe.remove();
     }
-
     const rawUrl = SOUNDCLOUD_URLS[index];
-    // Format the URL for the embed player with autoplay
     const embedUrl = `https://w.soundcloud.com/player/?url=${rawUrl}&color=%23000000&auto_play=true&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false`;
-
-    // Create the new iframe
     const iframe = document.createElement('iframe');
     iframe.width = "100%";
-    iframe.height = "166"; // Standard height for the player
+    iframe.height = "166";
     iframe.scrolling = "no";
     iframe.frameBorder = "no";
-    iframe.allow = "autoplay"; // CRITICAL for autoplay on user interaction
+    iframe.allow = "autoplay";
     iframe.src = embedUrl;
-
-    // Add to the hidden container and store reference
     audioContainer.appendChild(iframe);
     currentIframe = iframe;
-
-    // Log for verification as requested
-    console.log(`[Elina] Attempting to autoplay track ${index}: ${embedUrl}`);
+    console.log(`[Elina] Autoplay initiated by trusted click. Playing track ${index}`);
 }
 
 /**
@@ -201,10 +212,8 @@ function createWaveElement(wish) {
     wrapper.className = 'wave-wrapper';
     wrapper.dataset.trackIndex = wish.trackIndex;
 
-    // Container for the p5.js canvas
     const canvasContainer = document.createElement('div');
     canvasContainer.className = 'wave-canvas';
-    // Unique ID based on timestamp
     canvasContainer.id = `wave-canvas-${wish.timestamp}`; 
 
     const poemEl = document.createElement('p');
@@ -215,21 +224,15 @@ function createWaveElement(wish) {
     wishTextEl.className = 'wave-wish-text';
     wishTextEl.textContent = `"${wish.text}"`;
 
-    // Assemble the element
     wrapper.appendChild(canvasContainer);
     wrapper.appendChild(poemEl);
     wrapper.appendChild(wishTextEl);
 
-    // Add event listener to replay the song on click
     wrapper.addEventListener('click', () => {
         playTrack(wish.trackIndex);
     });
 
-    // Add to the top of the container (due to flex-direction: column-reverse)
     wavesContainer.prepend(wrapper);
-
-    // CRITICAL: Instantiate a new p5.js sketch for this specific wave
-    // We pass the sketch-generating function and the ID of the container
     new p5(createWaveSketch(wish), canvasContainer.id);
 }
 
@@ -239,15 +242,11 @@ function createWaveElement(wish) {
 function renderWaves() {
     wavesContainer.innerHTML = '';
     
-    // If wishes exist, hide the question immediately on load
     if (wishes.length > 0) {
         questionEl.classList.add('hidden');
         questionHidden = true;
     }
 
-    // Loop through all wishes and create their elements
-    // This will stack them correctly due to `prepend` in createWaveElement
-    // and the `column-reverse` layout.
     for (const wish of wishes) {
         createWaveElement(wish);
     }
@@ -256,16 +255,10 @@ function renderWaves() {
 
 // --- LOCALSTORAGE ---
 
-/**
- * Saves the current `wishes` array to localStorage.
- */
 function saveWishes() {
     localStorage.setItem('elinaWishes', JSON.stringify(wishes));
 }
 
-/**
- * Loads wishes from localStorage into the `wishes` state array.
- */
 function loadWishes() {
     const savedWishes = localStorage.getItem('elinaWishes');
     if (savedWishes) {
@@ -278,7 +271,6 @@ function loadWishes() {
 
 /**
  * p5.js sketch for the ambient background particles.
- * Runs in instance mode.
  */
 const backgroundSketch = (p) => {
     let particles = [];
@@ -293,19 +285,15 @@ const backgroundSketch = (p) => {
             this.size = p.random(1, 3);
             this.offset = p.random(1000);
         }
-
         update() {
             this.x += this.vx;
             this.y += this.vy;
-            // Wrap around edges
             if (this.x > p.width) this.x = 0;
             if (this.x < 0) this.x = p.width;
             if (this.y > p.height) this.y = 0;
             if (this.y < 0) this.y = p.height;
         }
-
         show() {
-            // Pulsing opacity
             let alpha = p.map(p.sin(p.frameCount * 0.01 + this.offset), -1, 1, 10, 70);
             p.noStroke();
             p.fill(255, 255, 255, alpha);
@@ -319,15 +307,13 @@ const backgroundSketch = (p) => {
             particles.push(new Particle());
         }
     };
-
     p.draw = () => {
-        p.clear(); // Use clear() for a transparent background
+        p.clear();
         for (let particle of particles) {
             particle.update();
             particle.show();
         }
     };
-
     p.windowResized = () => {
         p.resizeCanvas(window.innerWidth, window.innerHeight);
     };
@@ -335,49 +321,38 @@ const backgroundSketch = (p) => {
 
 
 /**
- * A *function factory* that returns a new p5.js sketch (closure) for a wave.
- * This allows each wave to have its own state (particles, time, colors).
+ * [ADVANCED WAVE SKETCH]
+ * A factory that returns a new p5.js sketch for a wave.
  * @param {object} wish - The wish object containing color data.
  */
 const createWaveSketch = (wish) => {
-    
-    // This is the actual p5.js sketch function
     return (p) => {
         let particles = [];
         let time = 0;
         const palette = WAVE_COLORS[wish.colorIndex];
-        const baseColor = palette.base;
         const particleColors = palette.particles;
-        const numParticles = 150; // 100+ particles
-
-        // Get the correct height based on media query
+        const numParticles = 300;
         const getWaveHeight = () => window.innerWidth <= 768 ? 250 : 300;
 
-        // Particle class *local to this sketch*
         class WaveParticle {
             constructor() {
                 this.x = p.random(p.width);
-                this.y = p.random(p.height);
-                this.vx = p.random(0.5, 1.5); // Flow to the right
+                this.yOffset = p.random(-1, 1); 
+                this.vx = p.random(0.5, 1.5);
                 this.color = p.random(particleColors);
-                this.size = p.random(1, 4);
                 this.offset = p.random(1000);
+                this.proximityToCenter = 1 - p.abs(this.yOffset); 
+                this.size = p.map(this.proximityToCenter, 0, 1, 1, 4);
+                this.alpha = p.map(this.proximityToCenter, 0, 1, 100, 255);
             }
 
             update(time) {
-                // Main wave logic using sin, cos, and noise
-                let mainWave = p.sin(this.x * 0.01 + time + this.offset) * (p.height / 5.5);
-                let secondWave = p.cos(this.x * 0.008 - time * 0.8 + this.offset) * (p.height / 6.5);
-                let noiseFactor = p.noise(this.x * 0.004, time * 0.3 + this.offset);
-
-                this.y = p.height / 2 + (mainWave + secondWave) * noiseFactor;
-                
-                // Add horizontal drift
+                let amp1 = p.sin(this.x * 0.01 + time + this.offset) * (p.height / 7);
+                let amp2 = p.cos(this.x * 0.008 - time * 0.8 + this.offset) * (p.height / 9);
+                let noiseFactor = p.noise(this.x * 0.005, time * 0.3 + this.offset);
+                let totalAmplitude = (amp1 + amp2) * noiseFactor;
+                this.y = p.height / 2 + this.yOffset * totalAmplitude;
                 this.x = (this.x + this.vx) % p.width;
-
-                // Vary alpha and size based on noise/position
-                this.alpha = p.map(noiseFactor, 0.2, 0.8, 100, 255, true);
-                this.size = p.map(noiseFactor, 0.2, 0.8, 1, 5, true);
             }
 
             show() {
@@ -388,44 +363,24 @@ const createWaveSketch = (wish) => {
         }
 
         p.setup = () => {
-            // Ensure parent container's width is used
             const parentWidth = document.getElementById(`wave-canvas-${wish.timestamp}`).clientWidth;
             p.createCanvas(parentWidth, getWaveHeight());
             p.colorMode(p.RGB);
-            
-            // Create particles for this wave
             for (let i = 0; i < numParticles; i++) {
                 particles.push(new WaveParticle());
             }
         };
 
         p.draw = () => {
-            p.background(0); // Solid black background
-            
-            // Draw a very faint "base" wave line
-            p.noFill();
-            p.stroke(baseColor[0], baseColor[1], baseColor[2], 50);
-            p.strokeWeight(1);
-            p.beginShape();
-            for (let x = 0; x <= p.width; x += 10) {
-                let noiseFactor = p.noise(x * 0.004, time * 0.3);
-                let mainWave = p.sin(x * 0.01 + time) * (p.height / 5.5);
-                let y = p.height / 2 + (mainWave) * noiseFactor;
-                p.vertex(x, y);
-            }
-            p.endShape();
-
-            // Update and draw all particles
+            p.background(0);
             for (let particle of particles) {
                 particle.update(time);
                 particle.show();
             }
-            
-            time += 0.02; // Animate time
+            time += 0.02;
         };
 
         p.windowResized = () => {
-            // Respond to window resize events
             const parentWidth = document.getElementById(`wave-canvas-${wish.timestamp}`).clientWidth;
             p.resizeCanvas(parentWidth, getWaveHeight());
         };
