@@ -70,10 +70,10 @@ const WAVE_COLORS = [
 
 // --- GLOBAL STATE & DOM ELEMENTS ---
 let wishes = [];
-let currentIframe = null;
-let currentWidget = null;
 let questionHidden = false;
-let questionEl, wavesContainer, formEl, inputEl, audioContainer, bgContainer;
+let questionEl, wavesContainer, formEl, inputEl, audioContainer, bgContainer, audioEl;
+let trackIds = new Array(SOUNDCLOUD_URLS.length); // Pre-resolved track IDs
+const clientId = 'YOUR_CLIENT_ID_HERE'; // Replace with the value you extract from browser network tab
 
 document.addEventListener('DOMContentLoaded', () => {
     questionEl = document.getElementById('main-question');
@@ -82,6 +82,16 @@ document.addEventListener('DOMContentLoaded', () => {
     inputEl = document.getElementById('wish-input');
     audioContainer = document.getElementById('audio-player-container');
     bgContainer = document.getElementById('bg-particle-container');
+    audioEl = document.getElementById('audio-player');
+
+    SC.initialize({ client_id: clientId });
+
+    // Pre-resolve all track IDs
+    SOUNDCLOUD_URLS.forEach((url, index) => {
+        SC.resolve(url).then(track => {
+            trackIds[index] = track.id;
+        }).catch(err => console.error(`Failed to resolve track ${index}:`, err));
+    });
 
     loadWishes();
     renderWaves();
@@ -136,31 +146,14 @@ function handleSendWish(e) {
     inputEl.placeholder = "Weave your words...";
 }
 
-// ✅ Fixed autoplay version for iPhone/iPad
 function playTrack(index) {
-    if (currentIframe) currentIframe.remove();
-    currentWidget = null;
+    if (!trackIds[index]) {
+        console.error(`Track ID for index ${index} not resolved yet.`);
+        return;
+    }
 
-    const rawUrl = SOUNDCLOUD_URLS[index];
-    const embedUrl = `https://w.soundcloud.com/player/?url=${encodeURIComponent(rawUrl)}&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false`;
-
-    const iframe = document.createElement('iframe');
-    iframe.width = "100%";
-    iframe.height = "166";
-    iframe.frameBorder = "no";
-    iframe.allow = "autoplay";
-    iframe.scrolling = "no";
-    iframe.src = embedUrl;
-    audioContainer.appendChild(iframe);
-    currentIframe = iframe;
-
-    iframe.addEventListener('load', () => {
-        const widget = SC.Widget(iframe);
-        widget.bind(SC.Widget.Events.READY, () => {
-            widget.play(); // <-- iOS-safe autoplay
-        });
-        currentWidget = widget;
-    });
+    audioEl.src = `https://api.soundcloud.com/tracks/${trackIds[index]}/stream?client_id=${clientId}`;
+    audioEl.play().catch(err => console.error('Playback failed:', err));
 }
 
 function createWaveElement(wish) {
@@ -185,7 +178,7 @@ function createWaveElement(wish) {
     wrapper.appendChild(wishTextEl);
     wrapper.addEventListener('click', () => playTrack(wish.trackIndex));
     wavesContainer.prepend(wrapper);
-    new p5(createWaveSketch(wish), canvasContainer.id);
+    new p5(createWaveSketch(wish), canvasContainer);
 }
 
 function renderWaves() {
@@ -206,7 +199,7 @@ function loadWishes() {
     if (saved) wishes = JSON.parse(saved);
 }
 
-// --- p5.js sketches below (same as before) ---
+// --- p5.js sketches ---
 
 const backgroundSketch = (p) => {
     let particles = [];
@@ -246,47 +239,33 @@ const backgroundSketch = (p) => {
 
 const createWaveSketch = (wish) => {
     return (p) => {
-        let particles = [];
         let time = 0;
         const palette = WAVE_COLORS[wish.colorIndex];
-        const colors = palette.particles;
-        const num = 300;
+        const numWaves = 5;
         const getH = () => window.innerWidth <= 768 ? 250 : 300;
-
-        class WaveParticle {
-            constructor() {
-                this.x = p.random(p.width);
-                this.yOffset = p.random(-1, 1);
-                this.vx = p.random(0.5, 1.5);
-                this.color = p.random(colors);
-                this.offset = p.random(1000);
-                this.proximity = 1 - p.abs(this.yOffset);
-                this.size = p.map(this.proximity, 0, 1, 1, 4);
-                this.alpha = p.map(this.proximity, 0, 1, 100, 255);
-            }
-            update(t) {
-                let amp1 = p.sin(this.x * 0.01 + t + this.offset) * (p.height / 7);
-                let amp2 = p.cos(this.x * 0.008 - t * 0.8 + this.offset) * (p.height / 9);
-                let n = p.noise(this.x * 0.005, t * 0.3 + this.offset);
-                this.y = p.height / 2 + this.yOffset * (amp1 + amp2) * n;
-                this.x = (this.x + this.vx) % p.width;
-            }
-            show() {
-                p.noStroke();
-                p.fill(this.color[0], this.color[1], this.color[2], this.alpha);
-                p.ellipse(this.x, this.y, this.size);
-            }
-        }
 
         p.setup = () => {
             const parentW = document.getElementById(`wave-canvas-${wish.timestamp}`).clientWidth;
             p.createCanvas(parentW, getH());
-            for (let i = 0; i < num; i++) particles.push(new WaveParticle());
         };
         p.draw = () => {
             p.background(0);
-            for (let part of particles) { part.update(time); part.show(); }
-            time += 0.02;
+            for (let i = 0; i < numWaves; i++) {
+                const color = p.random(palette.particles);
+                p.stroke(color[0], color[1], color[2], 200 - i * 30); // Fading alpha for depth
+                p.strokeWeight(2 + i * 0.5); // Varying thickness
+                p.noFill();
+                p.beginShape();
+                const amp = (p.height / 4) * (1 + 0.3 * p.sin(time * 0.1 + i)); // Bouncing amplitude
+                const freq = 0.01 + i * 0.002; // Different frequencies
+                const phase = time * (1 + i * 0.2) + i * p.PI / numWaves; // Moving and phased
+                for (let x = 0; x < p.width; x += 5) { // Step for performance
+                    const y = p.height / 2 + amp * p.sin(x * freq + phase);
+                    p.vertex(x, y);
+                }
+                p.endShape();
+            }
+            time += 0.02; // Animation speed
         };
         p.windowResized = () => {
             const parentW = document.getElementById(`wave-canvas-${wish.timestamp}`).clientWidth;
