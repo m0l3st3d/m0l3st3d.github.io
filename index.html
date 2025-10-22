@@ -1,37 +1,43 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Elina</title>
+    
+    <meta name="description" content="Weaving words and wishes into sound and void.">
+    
     <link rel="stylesheet" href="style.css">
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    
+    <script defer src="script.js"></script>
 </head>
 <body>
-    <!-- Background canvas for particles -->
-    <div id="canvas-container"></div>
-    
-    <!-- Main content container -->
-    <div id="main-container">
-        <!-- Initial question (will disappear after first wish) -->
-        <div id="question-container">
-            <h1 id="main-question">What would you like to bring into your orbit this year?</h1>
-        </div>
+
+    <div id="bg-particle-container"></div>
+
+    <main>
         
-        <!-- Waves stack container -->
-        <div id="waves-container"></div>
-    </div>
-    
-    <!-- Input bar at bottom -->
-    <div id="input-container">
-        <input type="text" id="wish-input" placeholder="Type your wish..." maxlength="200">
-        <button id="send-button">Send</button>
-    </div>
-    
-    <!-- Hidden SoundCloud iframe for audio playback -->
-    <div id="audio-container"></div>
-    
-    <script src="script.js"></script>
+        <h1 id="main-question">What would you like to bring into your orbit this year?</h1>
+        
+        <div id="waves-container">
+            </div>
+
+    </main>
+
+    <form id="wish-form" action="#">
+        <input 
+            type="text" 
+            id="wish-input" 
+            placeholder="Weave your words..." 
+            autocomplete="off"
+            aria-label="Type your wish here"
+        >
+        <button type="submit" id="send-button">Send</button>
+    </form>
+
+    <div id="audio-player-container"></div>
+
 </body>
 </html>
