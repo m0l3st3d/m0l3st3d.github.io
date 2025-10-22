@@ -70,40 +70,37 @@ const WAVE_COLORS = [
 
 // --- GLOBAL STATE & DOM ELEMENTS ---
 let wishes = [];
+let widgets = []; // Array of pre-loaded widgets
 let questionHidden = false;
-let questionEl, wavesContainer, formEl, inputEl, audioContainer, bgContainer, audioEl;
-let clientId = null;
-let trackIds = new Array(SOUNDCLOUD_URLS.length); // Pre-resolved track IDs
+let questionEl, wavesContainer, formEl, inputEl, audioContainer, bgContainer;
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     questionEl = document.getElementById('main-question');
     wavesContainer = document.getElementById('waves-container');
     formEl = document.getElementById('wish-form');
     inputEl = document.getElementById('wish-input');
     audioContainer = document.getElementById('audio-player-container');
     bgContainer = document.getElementById('bg-particle-container');
-    audioEl = document.getElementById('audio-player');
 
-    // Extract client_id dynamically
-    clientId = await extractClientId();
-    if (!clientId) {
-        console.error('Failed to extract SoundCloud client_id');
-        // Fallback to widget method or alert user
-        return;
-    }
+    // Pre-load all iframes hidden
+    SOUNDCLOUD_URLS.forEach((rawUrl, index) => {
+        const embedUrl = `https://w.soundcloud.com/player/?url=${encodeURIComponent(rawUrl)}&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false`;
+        
+        const iframe = document.createElement('iframe');
+        iframe.width = "0";
+        iframe.height = "0";
+        iframe.frameBorder = "no";
+        iframe.allow = "autoplay";
+        iframe.scrolling = "no";
+        iframe.src = embedUrl;
+        iframe.style.display = 'none';
+        iframe.id = `sc-iframe-${index}`;
+        audioContainer.appendChild(iframe);
 
-    // Pre-resolve all track IDs using client_id
-    for (let index = 0; index < SOUNDCLOUD_URLS.length; index++) {
-        const url = SOUNDCLOUD_URLS[index];
-        const resolveUrl = `https://api.soundcloud.com/resolve?url=${encodeURIComponent(url)}&client_id=${clientId}`;
-        try {
-            const response = await fetch(resolveUrl);
-            const track = await response.json();
-            trackIds[index] = track.id;
-        } catch (err) {
-            console.error(`Failed to resolve track ${index}:`, err);
-        }
-    }
+        iframe.addEventListener('load', () => {
+            widgets[index] = SC.Widget(iframe);
+        });
+    });
 
     loadWishes();
     renderWaves();
@@ -111,57 +108,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     new p5(backgroundSketch, bgContainer);
 });
 
-async function extractClientId() {
-    const proxy = 'https://allorigins.win/get?url=';
-    const soundcloudUrl = 'https://soundcloud.com/';
-
-    try {
-        // Fetch main page
-        const pageResponse = await fetch(proxy + encodeURIComponent(soundcloudUrl));
-        const pageData = await pageResponse.json();
-        const pageHtml = pageData.contents;
-
-        // Find script srcs (reverse to find latest)
-        const scriptRegex = /<script[^>]+src="([^"]+)"[^>]*>/g;
-        const scripts = [];
-        let match;
-        while ((match = scriptRegex.exec(pageHtml)) !== null) {
-            scripts.push(match[1]);
-        }
-        scripts.reverse(); // As in youtube-dl
-
-        // Fetch scripts and search for client_id
-        for (const src of scripts) {
-            if (src.startsWith('https://a-v2.sndcdn.com/')) { // Likely the JS bundles
-                const scriptResponse = await fetch(proxy + encodeURIComponent(src));
-                const scriptData = await scriptResponse.json();
-                const scriptContent = scriptData.contents;
-
-                const idRegex = /client_id\s*:\s*"([0-9a-zA-Z]{32})"/;
-                const idMatch = scriptContent.match(idRegex);
-                if (idMatch) {
-                    return idMatch[1];
-                }
-            }
-        }
-    } catch (err) {
-        console.error('Error extracting client_id:', err);
-    }
-    return null;
-}
-
 function setupEventListeners() {
     formEl.addEventListener('submit', handleSendWish);
-    inputEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            inputEl.value = "";
-            inputEl.placeholder = "Please click 'Send' to begin...";
-        }
-    });
     inputEl.addEventListener('focus', () => {
         inputEl.placeholder = "Weave your words...";
     });
+    // Removed the keydown handler that clears on enter, so enter submits the form
 }
 
 // --- CORE LOGIC ---
@@ -198,13 +150,16 @@ function handleSendWish(e) {
 }
 
 function playTrack(index) {
-    if (!trackIds[index] || !clientId) {
-        console.error(`Track ID or client_id not available for index ${index}`);
+    const widget = widgets[index];
+    if (!widget) {
+        console.error(`Widget for index ${index} not ready.`);
         return;
     }
-
-    audioEl.src = `https://api.soundcloud.com/tracks/${trackIds[index]}/stream?client_id=${clientId}`;
-    audioEl.play().catch(err => console.error('Playback failed:', err));
+    // Pause all others if playing
+    widgets.forEach((w, i) => {
+        if (i !== index && w) w.pause();
+    });
+    widget.play();
 }
 
 function createWaveElement(wish) {
@@ -316,13 +271,11 @@ const createWaveSketch = (wish) => {
                 const phase = time * (1.5 + i * 0.3) + i * p.PI / numWaves; // Faster movement
                 const noiseScale = amp / 4; // Organic noise
 
-                let prevY = p.height / 2;
                 p.vertex(0, p.height); // For fill to bottom
                 for (let x = 0; x < p.width; x += 3) { // Finer steps for smoothness
                     const noiseVal = p.noise(x * 0.005, time * 0.2 + i) * 2 - 1; // Perlin for hypnosis
                     const y = p.height / 2 + amp * p.sin(x * freq + phase) + noiseVal * noiseScale;
                     p.vertex(x, y);
-                    prevY = y;
                 }
                 p.vertex(p.width, p.height); // Close fill
                 p.endShape(p.CLOSE); // Fill under wave
