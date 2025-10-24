@@ -195,8 +195,9 @@ function loadWishes() {
     if (saved) wishes = JSON.parse(saved);
 }
 
-// --- p5.js sketches below (unchanged) ---
+// --- p5.js sketches below ---
 
+// This background sketch is unchanged
 const backgroundSketch = (p) => {
     let particles = [];
     const num = 80;
@@ -233,53 +234,86 @@ const backgroundSketch = (p) => {
     p.windowResized = () => p.resizeCanvas(window.innerWidth, window.innerHeight);
 };
 
+// --- THIS IS THE UPDATED SKETCH ---
 const createWaveSketch = (wish) => {
     return (p) => {
-        let particles = [];
+        let waves = [];
         let time = 0;
         const palette = WAVE_COLORS[wish.colorIndex];
         const colors = palette.particles;
-        const num = 300;
+        const numWaves = 12; // Draw 12 waves
         const getH = () => window.innerWidth <= 768 ? 250 : 300;
 
-        class WaveParticle {
+        // Define the properties for one wave
+        class Wave {
             constructor() {
-                this.x = p.random(p.width);
-                this.yOffset = p.random(-1, 1);
-                this.vx = p.random(0.5, 1.5);
                 this.color = p.random(colors);
-                this.offset = p.random(1000);
-                this.proximity = 1 - p.abs(this.yOffset);
-                this.size = p.map(this.proximity, 0, 1, 1, 4);
-                this.alpha = p.map(this.proximity, 0, 1, 100, 255);
+                this.strokeWeight = p.random(0.5, 2.5);
+                this.offset = p.random(1000); // Time offset (for sync)
+                // Each wave gets its own vertical center
+                this.yCenter = p.height / 2 + p.random(-p.height / 5, p.height / 5);
+                
+                // Use similar physics as the original particle sketch
+                this.freq1 = p.random(0.008, 0.012);
+                this.freq2 = p.random(0.005, 0.01);
+                this.amp1 = p.random(p.height / 10, p.height / 7);
+                this.amp2 = p.random(p.height / 12, p.height / 9);
+                this.speed = p.random(0.7, 1.3); // How fast this wave moves
+                this.noiseFreq = p.random(0.004, 0.006);
+                this.noiseSpeed = p.random(0.2, 0.4);
             }
-            update(t) {
-                let amp1 = p.sin(this.x * 0.01 + t + this.offset) * (p.height / 7);
-                let amp2 = p.cos(this.x * 0.008 - t * 0.8 + this.offset) * (p.height / 9);
-                let n = p.noise(this.x * 0.005, t * 0.3 + this.offset);
-                this.y = p.height / 2 + this.yOffset * (amp1 + amp2) * n;
-                this.x = (this.x + this.vx) % p.width;
-            }
-            show() {
-                p.noStroke();
-                p.fill(this.color[0], this.color[1], this.color[2], this.alpha);
-                p.ellipse(this.x, this.y, this.size);
+
+            // Draw the wave
+            draw(t) {
+                p.noFill();
+                p.stroke(this.color[0], this.color[1], this.color[2], 180); // 180 alpha for nice overlap
+                p.strokeWeight(this.strokeWeight);
+                
+                p.beginShape();
+                let time = t * this.speed + this.offset;
+                
+                for (let x = -10; x <= p.width + 10; x += 5) { // Iterate across x-axis
+                    let t_noise = t * this.noiseSpeed + this.offset;
+                    
+                    // Same math as the original particle Y position
+                    let amp1 = p.sin(x * this.freq1 + time) * this.amp1;
+                    let amp2 = p.cos(x * this.freq2 - time * 0.8 + this.offset) * this.amp2;
+                    let n = p.noise(x * this.noiseFreq, t_noise);
+                    
+                    let y = this.yCenter + (amp1 + amp2) * n;
+                    
+                    p.vertex(x, y);
+                }
+                p.endShape();
             }
         }
 
         p.setup = () => {
             const parentW = document.getElementById(`wave-canvas-${wish.timestamp}`).clientWidth;
             p.createCanvas(parentW, getH());
-            for (let i = 0; i < num; i++) particles.push(new WaveParticle());
+            // Create all the wave objects
+            for (let i = 0; i < numWaves; i++) {
+                waves.push(new Wave());
+            }
         };
+
         p.draw = () => {
             p.background(0);
-            for (let part of particles) { part.update(time); part.show(); }
-            time += 0.02;
+            // Update and draw all waves
+            for (let wave of waves) {
+                wave.draw(time);
+            }
+            time += 0.02; // Increment global time
         };
+
         p.windowResized = () => {
             const parentW = document.getElementById(`wave-canvas-${wish.timestamp}`).clientWidth;
             p.resizeCanvas(parentW, getH());
+            // Recalculate wave properties on resize
+            waves = [];
+            for (let i = 0; i < numWaves; i++) {
+                waves.push(new Wave());
+            }
         };
     };
 };
