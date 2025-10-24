@@ -29,33 +29,13 @@ const POEMS = [
     "All that was spoken shall return as light—your whisper becomes the infinite night."
 ];
 
-// 25 SoundCloud Track URLs
-const SOUNDCLOUD_URLS = [
-"https://soundcloud.com/mutantradio/scrying-the-landscape-elina-tapio-and-hannah-pezzack-02042021",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-ii-w-elina-tapio-hannah-pezzack-28052021",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-iii-w-elina-tapio-and-hannah-pezzack-28072021",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-and-hannah-pezzack-29092021",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-and-hannah-pezzack-11112021",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-and-hannah-pezzack-17032022",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-and-hannah-pezzack-24052022",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-and-hannah-pezzack-26072022",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-x-w-loma-doom-23092022",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-and-hannah-pezzack-06122022",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-and-hannah-pezzack-06022023",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-hannah-pezzack-and-alice-rougeaux-06042023",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-hannah-pezzack-02082023",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-xv-w-la-serpiente-searching-for-the-sublime-04102023",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-xvi-w-haron-04122023",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-hannah-pezzack-08042024",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-hannah-pezzack",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-hannah-pezzack-070924",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-dim-garden-071124",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-hannah-pezzack-080225",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-hannah-pezzack-100425-5",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-alina-valentina-100625-4",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-hannah-pezzack-100425-5",
-"https://soundcloud.com/mutantradio/scrying-the-landscape-w-elina-tapio-hannah-pezzack-100425-5"
+// 5 Local Audio Files
+const AUDIO_FILES = [
+    "./1.mp3",
+    "./2.mp3",
+    "./3.mp3",
+    "./4.mp3",
+    "./5.mp3"
 ];
 
 // 6 Color Palettes for Waves
@@ -70,7 +50,7 @@ const WAVE_COLORS = [
 
 // --- GLOBAL STATE & DOM ELEMENTS ---
 let wishes = [];
-let widgets = []; // Array of pre-loaded widgets
+let currentAudio = null; // Replaces iframe/widget
 let questionHidden = false;
 let questionEl, wavesContainer, formEl, inputEl, audioContainer, bgContainer;
 
@@ -79,28 +59,8 @@ document.addEventListener('DOMContentLoaded', () => {
     wavesContainer = document.getElementById('waves-container');
     formEl = document.getElementById('wish-form');
     inputEl = document.getElementById('wish-input');
-    audioContainer = document.getElementById('audio-player-container');
+    audioContainer = document.getElementById('audio-player-container'); // We still use this container
     bgContainer = document.getElementById('bg-particle-container');
-
-    // Pre-load all iframes hidden
-    SOUNDCLOUD_URLS.forEach((rawUrl, index) => {
-        const embedUrl = `https://w.soundcloud.com/player/?url=${encodeURIComponent(rawUrl)}&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false`;
-        
-        const iframe = document.createElement('iframe');
-        iframe.width = "0";
-        iframe.height = "0";
-        iframe.frameBorder = "no";
-        iframe.allow = "autoplay";
-        iframe.scrolling = "no";
-        iframe.src = embedUrl;
-        iframe.style.display = 'none';
-        iframe.id = `sc-iframe-${index}`;
-        audioContainer.appendChild(iframe);
-
-        iframe.addEventListener('load', () => {
-            widgets[index] = SC.Widget(iframe);
-        });
-    });
 
     loadWishes();
     renderWaves();
@@ -110,10 +70,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function setupEventListeners() {
     formEl.addEventListener('submit', handleSendWish);
+    inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            inputEl.value = "";
+            inputEl.placeholder = "Please click 'Send' to begin...";
+        }
+    });
     inputEl.addEventListener('focus', () => {
         inputEl.placeholder = "Weave your words...";
     });
-    // Removed the keydown handler that clears on enter, so enter submits the form
 }
 
 // --- CORE LOGIC ---
@@ -129,7 +95,7 @@ function handleSendWish(e) {
     }
 
     const wishIndex = wishes.length;
-    const trackIndex = wishIndex % SOUNDCLOUD_URLS.length;
+    const trackIndex = wishIndex % AUDIO_FILES.length; // Use new array
     const poemIndex = wishIndex % POEMS.length;
     const colorIndex = wishIndex % WAVE_COLORS.length;
 
@@ -144,22 +110,43 @@ function handleSendWish(e) {
     wishes.push(newWish);
     saveWishes();
     createWaveElement(newWish);
-    playTrack(newWish.trackIndex);
+    playTrack(newWish.trackIndex); // This is a user-initiated action
     inputEl.value = '';
     inputEl.placeholder = "Weave your words...";
 }
 
+// ✅ NEW native <audio> version that works on mobile
 function playTrack(index) {
-    const widget = widgets[index];
-    if (!widget) {
-        console.error(`Widget for index ${index} not ready.`);
-        return;
+    // 1. Stop and remove any currently playing audio
+    if (currentAudio) {
+        currentAudio.pause();
+        audioContainer.innerHTML = '';
+        currentAudio = null;
     }
-    // Pause all others if playing
-    widgets.forEach((w, i) => {
-        if (i !== index && w) w.pause();
-    });
-    widget.play();
+
+    // 2. Get the path to the new track
+    const trackPath = AUDIO_FILES[index];
+
+    // 3. Create a new <audio> element
+    const audio = document.createElement('audio');
+    audio.src = trackPath;
+    audio.controls = true; // Show the browser's default controls
+    audio.style.width = "100%"; // Make it fit the container
+    
+    // 4. Append it to the container and play it
+    audioContainer.appendChild(audio);
+    
+    // 5. Store reference
+    currentAudio = audio; 
+
+    // 6. Play the audio. This is allowed because it was triggered by a user click.
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+        playPromise.catch(error => {
+            // Autoplay was prevented even though it was user-initiated (rare)
+            console.error("Audio playback failed:", error);
+        });
+    }
 }
 
 function createWaveElement(wish) {
@@ -182,9 +169,12 @@ function createWaveElement(wish) {
     wrapper.appendChild(canvasContainer);
     wrapper.appendChild(poemEl);
     wrapper.appendChild(wishTextEl);
+    
+    // Clicking a wave will also now play the correct local track
     wrapper.addEventListener('click', () => playTrack(wish.trackIndex));
+    
     wavesContainer.prepend(wrapper);
-    new p5(createWaveSketch(wish), canvasContainer);
+    new p5(createWaveSketch(wish), canvasContainer.id);
 }
 
 function renderWaves() {
@@ -205,7 +195,7 @@ function loadWishes() {
     if (saved) wishes = JSON.parse(saved);
 }
 
-// --- p5.js sketches ---
+// --- p5.js sketches below (unchanged) ---
 
 const backgroundSketch = (p) => {
     let particles = [];
@@ -245,42 +235,47 @@ const backgroundSketch = (p) => {
 
 const createWaveSketch = (wish) => {
     return (p) => {
+        let particles = [];
         let time = 0;
         const palette = WAVE_COLORS[wish.colorIndex];
-        const numWaves = 8; // More waves for depth
+        const colors = palette.particles;
+        const num = 300;
         const getH = () => window.innerWidth <= 768 ? 250 : 300;
+
+        class WaveParticle {
+            constructor() {
+                this.x = p.random(p.width);
+                this.yOffset = p.random(-1, 1);
+                this.vx = p.random(0.5, 1.5);
+                this.color = p.random(colors);
+                this.offset = p.random(1000);
+                this.proximity = 1 - p.abs(this.yOffset);
+                this.size = p.map(this.proximity, 0, 1, 1, 4);
+                this.alpha = p.map(this.proximity, 0, 1, 100, 255);
+            }
+            update(t) {
+                let amp1 = p.sin(this.x * 0.01 + t + this.offset) * (p.height / 7);
+                let amp2 = p.cos(this.x * 0.008 - t * 0.8 + this.offset) * (p.height / 9);
+                let n = p.noise(this.x * 0.005, t * 0.3 + this.offset);
+                this.y = p.height / 2 + this.yOffset * (amp1 + amp2) * n;
+                this.x = (this.x + this.vx) % p.width;
+            }
+            show() {
+                p.noStroke();
+                p.fill(this.color[0], this.color[1], this.color[2], this.alpha);
+                p.ellipse(this.x, this.y, this.size);
+            }
+        }
 
         p.setup = () => {
             const parentW = document.getElementById(`wave-canvas-${wish.timestamp}`).clientWidth;
             p.createCanvas(parentW, getH());
+            for (let i = 0; i < num; i++) particles.push(new WaveParticle());
         };
         p.draw = () => {
             p.background(0);
-            for (let i = 0; i < numWaves; i++) {
-                const color = p.random(palette.particles);
-                const alpha = 150 - i * 20; // Fading for layers
-                p.stroke(color[0], color[1], color[2], alpha);
-                p.strokeWeight(3 + i * 0.3); // Thicker base
-                p.fill(color[0], color[1], color[2], alpha / 4); // Semi-transparent fill for glow
-
-                p.beginShape();
-                const baseAmp = p.height / 3;
-                const pulse = 1 + 0.5 * p.sin(time * 0.15 + i * 0.5); // Stronger pulsing
-                const amp = baseAmp * pulse;
-                const freq = 0.008 + i * 0.003; // Wider frequency range
-                const phase = time * (1.5 + i * 0.3) + i * p.PI / numWaves; // Faster movement
-                const noiseScale = amp / 4; // Organic noise
-
-                p.vertex(0, p.height); // For fill to bottom
-                for (let x = 0; x < p.width; x += 3) { // Finer steps for smoothness
-                    const noiseVal = p.noise(x * 0.005, time * 0.2 + i) * 2 - 1; // Perlin for hypnosis
-                    const y = p.height / 2 + amp * p.sin(x * freq + phase) + noiseVal * noiseScale;
-                    p.vertex(x, y);
-                }
-                p.vertex(p.width, p.height); // Close fill
-                p.endShape(p.CLOSE); // Fill under wave
-            }
-            time += 0.05; // Faster animation for dynamism
+            for (let part of particles) { part.update(time); part.show(); }
+            time += 0.02;
         };
         p.windowResized = () => {
             const parentW = document.getElementById(`wave-canvas-${wish.timestamp}`).clientWidth;
