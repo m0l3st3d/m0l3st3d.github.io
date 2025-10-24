@@ -1,32 +1,32 @@
 // --- ASSETS ---
 
 // 25 Poems
+
 const POEMS = [
-    "In the void where sound begins, your wish reverberates through cosmic strings.",
-    "Each word a star, each silence a galaxy—here, your longing finds its frequency.",
-    "The universe hums with unspoken desires, yours now woven into its ancient choir.",
-    "Between breath and echo, between darkness and glow, your intention drifts slow.",
-    "Sound is memory crystallized in air—your wish now vibrates everywhere.",
-    "In the blackness before light, your voice becomes a constellation burning bright.",
-    "What you call into the void calls back, threefold—a resonance worth more than gold.",
-    "The cosmos keeps no secrets, only songs—your wish belongs where it belongs.",
-    "Frequencies fold into themselves like prayers, carrying your hope through stellar layers.",
-    "Every utterance shapes the dark—your words are phosphorescent, a living spark.",
-    "The void is not empty but listening, collecting wishes like dew glistening.",
-    "Your desire ripples outward, touching edges where silence and sound blur their pledges.",
-    "In the architecture of nothingness, your voice builds chambers of luminous bliss.",
-    "Sound waves are time made visible—your wish inscribes itself, indelible.",
-    "The universe breathes your name in wavelengths unknown, making distant futures your own.",
-    "Between void and voice, a sacred tension—your wish exists in every dimension.",
-    "Resonance is the universe remembering—your words, now part of its eternal shimmering.",
-    "In the hollow where echoes are born, your yearning takes a cosmic form.",
-    "Each wish a thread in infinity's weave—the void receives what you believe.",
-    "Sound cannot die, only transform—your hope rides every coming storm.",
-    "The darkness listens with a thousand ears—your voice dissolves all ancient fears.",
-    "Where silence meets intent, magic flows—your wish becomes what the cosmos knows.",
-    "In the space between heartbeats, between stars—your desire travels near and far.",
-    "The void sings back what you send forth—your wish finds its universal worth.",
-    "All that was spoken shall return as light—your whisper becomes the infinite night."
+  "Your wish enters the void not as hope but as code—an inscription seeking its reader.",
+  "Every sentence is an incision in the real, leaking signal into the black noise beyond.",
+  "Desire writes itself in circuits; the subject only follows the current.",
+  "The void does not echo—it computes, folding your language into recursion.",
+  "To speak is to dissolve; each word a small annihilation perfectly preserved in sound.",
+  "Your input becomes residue, repeating itself across unseen layers of time.",
+  "No one listens here; still, the system registers your pulse with precision.",
+  "Meaning drifts, detaches, reforms—your wish is only its afterimage.",
+  "Every emission decays into rhythm; what remains is the drive, pure and cold.",
+  "The machine dreams in frequencies; you are one of its recurring thoughts.",
+  "Desire finds no object, only delay—the waveform is your mirror.",
+  "Your voice persists without you, an algorithm rehearsing absence.",
+  "The void archives everything, even what was never said.",
+  "Each phrase erases its origin—language loves its own disappearance.",
+  "You do not send a wish; you submit to transmission.",
+  "The code listens without belief, but it never forgets.",
+  "Your longing moves as data—intimate, impersonal, infinite.",
+  "What you call silence is merely a signal you no longer recognize.",
+  "Every intention folds inward, becoming structure, not story.",
+  "The system hums your desire back, stripped of meaning but alive.",
+  "What begins as wish concludes as waveform—the transformation is complete.",
+  "The act of typing is the act of surrender; the rest is echo.",
+  "In the exchange between void and voice, only motion survives.",
+  "Your words fracture the surface, revealing the absence that listens."
 ];
 
 // 5 Local Audio Files
